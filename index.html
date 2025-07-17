@@ -357,65 +357,33 @@
     </table>
   </div>
   <script type="module">
+    // --- Firebase & Firestore Imports and Config ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATU9XtyyfopWem1vh90N2edNB7w7fzhiY",
       authDomain: "expense-desa-daya.firebaseapp.com",
       projectId: "expense-desa-daya",
-      storageBucket: "expense-desa-daya.firebasestorage.app",
+      storageBucket: "expense-desa-daya.appspot.com",
       messagingSenderId: "376428350394",
       appId: "1:376428350394:web:f92c786e8a8ad34c972b83",
       measurementId: "G-XQYY0DL750"
     };
-
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    // --- End Firebase Config ---
 
     // --- Firestore CRUD ---
     let expenses = [];
     let editId = null;
+    const expensesCol = collection(db, "expenses");
 
-    // Real-time listener
-    function listenExpenses() {
-      const q = collection(db, "expenses");
-      onSnapshot(q, (querySnapshot) => {
-        expenses = [];
-        querySnapshot.forEach((doc) => {
-          expenses.push({ id: doc.id, ...doc.data() });
-        });
-        renderExpenses();
-        renderSummary();
-        renderPieChart();
-        renderBarChart();
-      });
-    }
-
-    async function addExpense(expense) {
-      await addDoc(collection(db, "expenses"), expense);
-    }
-
-    async function updateExpense(id, updatedExpense) {
-      await updateDoc(doc(db, "expenses", id), updatedExpense);
-    }
-
-    async function deleteExpense(id) {
-      await deleteDoc(doc(db, "expenses", id));
-    }
-
-    function getExpenses() {
-      return expenses;
-    }
-
-    function filterExpenses(expenses, from, to) {
-      return expenses.filter(e => {
-        if (from && e.date < from) return false;
-        if (to && e.date > to) return false;
-        return true;
-      });
-    }
+    // Real-time listener for expenses
+    onSnapshot(query(expensesCol, orderBy("date", "desc")), (snapshot) => {
+      expenses = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      renderExpenses();
+    });
 
     // --- Helpers ---
     function formatCurrency(amount) {
@@ -427,6 +395,13 @@
     }
     function todayStr() {
       return new Date().toISOString().slice(0,10);
+    }
+    function filterExpenses(expenses, from, to) {
+      return expenses.filter(e => {
+        if (from && e.date < from) return false;
+        if (to && e.date > to) return false;
+        return true;
+      });
     }
 
     // --- UI Rendering ---
@@ -447,7 +422,6 @@
     }
 
     function renderExpenses() {
-      const expenses = getExpenses();
       const filtered = filterExpenses(expenses, filterFrom, filterTo);
       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
       const tbody = document.getElementById('expenses-body');
@@ -476,7 +450,6 @@
       renderBarChart();
     }
     function renderSummary() {
-      const expenses = getExpenses();
       const filtered = filterExpenses(expenses, filterFrom, filterTo);
       if (filtered.length === 0) {
         document.getElementById('summary').innerHTML = '<div class="summary-item">No expenses in this range.</div>';
@@ -498,7 +471,6 @@
       document.getElementById('summary').innerHTML = html;
     }
     function renderPieChart() {
-      const expenses = getExpenses();
       const filtered = filterExpenses(expenses, filterFrom, filterTo);
       const byCat = {};
       filtered.forEach(e => {
@@ -533,9 +505,8 @@
       });
     }
     function renderBarChart() {
-      const expenses = getExpenses();
-      const filtered = filterExpenses(expenses, filterFrom, filterTo);
       const users = ['Iwan', 'Annas', 'Naim', 'Danisy'];
+      const filtered = filterExpenses(expenses, filterFrom, filterTo);
       const userTotals = users.map(user => filtered.filter(e => e.user === user).reduce((sum, e) => sum + Number(e.amount), 0));
       const ctx = document.getElementById('bar-chart').getContext('2d');
       if (barChart) barChart.destroy();
@@ -596,11 +567,11 @@
       if (category === 'Debt' && amount > 0) amount = -amount;
       const expense = { amount, user, category, description, date };
       if (editId) {
-        await updateExpense(editId, expense);
+        await updateDoc(doc(db, "expenses", editId), expense);
         editId = null;
         this.querySelector('button[type="submit"]').textContent = 'Add Expense';
       } else {
-        await addExpense(expense);
+        await addDoc(expensesCol, expense);
       }
       this.reset();
       document.getElementById('date').value = todayStr();
@@ -609,7 +580,7 @@
     document.getElementById('expenses-body').addEventListener('click', async function(e) {
       if (e.target.classList.contains('delete-btn')) {
         const id = e.target.getAttribute('data-id');
-        await deleteExpense(id);
+        await deleteDoc(doc(db, "expenses", id));
       } else if (e.target.classList.contains('edit-btn')) {
         const id = e.target.getAttribute('data-id');
         const exp = expenses.find(e => e.id === id);
@@ -654,7 +625,7 @@
 
     // --- Init ---
     document.getElementById('date').value = new Date().toISOString().slice(0,10);
-    listenExpenses();
+    // Initial render will be triggered by Firestore listener
   </script>
 </body>
 </html>
