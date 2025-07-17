@@ -356,15 +356,57 @@
       </tbody>
     </table>
   </div>
-  <script>
-    // --- Data & Storage ---
-    const STORAGE_KEY = 'monthly_expenses';
-    function getExpenses() {
-      const data = localStorage.getItem(STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBYgemYoKMBKB3FdCP8OJLi3NQuKmzgHn0",
+      authDomain: "expense-tracker-desa-daya.firebaseapp.com",
+      projectId: "expense-tracker-desa-daya",
+      storageBucket: "expense-tracker-desa-daya.firebasestorage.app",
+      messagingSenderId: "622825393892",
+      appId: "1:622825393892:web:bc07625d4776a678c566f1",
+      measurementId: "G-4XWMQE6CV2"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- Firestore CRUD ---
+    let expenses = [];
+    let editId = null;
+
+    // Real-time listener
+    function listenExpenses() {
+      const q = collection(db, "expenses");
+      onSnapshot(q, (querySnapshot) => {
+        expenses = [];
+        querySnapshot.forEach((doc) => {
+          expenses.push({ id: doc.id, ...doc.data() });
+        });
+        renderExpenses();
+        renderSummary();
+        renderPieChart();
+        renderBarChart();
+      });
     }
-    function saveExpenses(expenses) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+
+    async function addExpense(expense) {
+      await addDoc(collection(db, "expenses"), expense);
+    }
+
+    async function updateExpense(id, updatedExpense) {
+      await updateDoc(doc(db, "expenses", id), updatedExpense);
+    }
+
+    async function deleteExpense(id) {
+      await deleteDoc(doc(db, "expenses", id));
+    }
+
+    function getExpenses() {
+      return expenses;
     }
 
     // --- Helpers ---
@@ -378,19 +420,10 @@
     function todayStr() {
       return new Date().toISOString().slice(0,10);
     }
-    function filterExpenses(expenses, from, to) {
-      if (!from && !to) return expenses;
-      return expenses.filter(e => {
-        if (from && e.date < from) return false;
-        if (to && e.date > to) return false;
-        return true;
-      });
-    }
 
     // --- UI Rendering ---
     let filterFrom = '';
     let filterTo = '';
-    let editIdx = null;
     let pieChart = null;
     let barChart = null;
 
@@ -542,49 +575,7 @@
       document.getElementById('settle-summary').innerHTML = html;
     }
 
-    // --- SheetDB API ---
-    const SHEETDB_API = 'https://sheetdb.io/api/v1/3201rsw495epg';
-    let sheetExpenses = [];
-    let isLoading = false;
-
-    async function fetchExpensesFromSheet() {
-      isLoading = true;
-      try {
-        const res = await fetch(SHEETDB_API);
-        const data = await res.json();
-        sheetExpenses = data;
-      } catch (e) {
-        alert('Failed to fetch data from SheetDB.');
-      }
-      isLoading = false;
-    }
-
-    async function addExpenseToSheet(expense) {
-      await fetch(SHEETDB_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: expense })
-      });
-    }
-
-    async function updateExpenseInSheet(id, updatedExpense) {
-      await fetch(`${SHEETDB_API}/id/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: updatedExpense })
-      });
-    }
-
-    async function deleteExpenseFromSheet(id) {
-      await fetch(`${SHEETDB_API}/id/${id}`, {
-        method: 'DELETE' });
-    }
-
-    function getExpenses() {
-      return sheetExpenses;
-    }
-
-    // --- Event Handlers ---
+    // --- UI Event Handlers ---
     document.getElementById('expense-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       const amountInput = document.getElementById('amount').value;
@@ -595,64 +586,35 @@
       if (!amountInput || !user || !category || !date) return;
       let amount = Number(amountInput);
       if (category === 'Debt' && amount > 0) amount = -amount;
-      const id = Date.now().toString() + Math.random().toString(36).slice(2, 8);
-      const expense = { id, amount, user, category, description, date };
-      await addExpenseToSheet(expense);
-      await fetchExpensesFromSheet();
-      renderExpenses();
-      renderSummary();
-      renderPieChart();
-      renderBarChart();
+      const expense = { amount, user, category, description, date };
+      if (editId) {
+        await updateExpense(editId, expense);
+        editId = null;
+        this.querySelector('button[type="submit"]').textContent = 'Add Expense';
+      } else {
+        await addExpense(expense);
+      }
       this.reset();
       document.getElementById('date').value = todayStr();
     });
+
     document.getElementById('expenses-body').addEventListener('click', async function(e) {
       if (e.target.classList.contains('delete-btn')) {
         const id = e.target.getAttribute('data-id');
-        const expenses = getExpenses();
-        const exp = expenses.find(e => e.id === id);
-        await deleteExpenseFromSheet(id);
-        await fetchExpensesFromSheet();
-        renderExpenses();
-        renderSummary();
-        renderPieChart();
-        renderBarChart();
+        await deleteExpense(id);
       } else if (e.target.classList.contains('edit-btn')) {
         const id = e.target.getAttribute('data-id');
-        const expenses = getExpenses();
         const exp = expenses.find(e => e.id === id);
         document.getElementById('amount').value = Math.abs(exp.amount);
         document.getElementById('user').value = exp.user;
         document.getElementById('category').value = exp.category;
         document.getElementById('description').value = exp.description || '';
         document.getElementById('date').value = exp.date;
-        editIdx = expenses.findIndex(e => e.id === id);
+        editId = id;
         document.getElementById('expense-form').querySelector('button[type="submit"]').textContent = 'Save Edit';
-        // On next submit, update instead of add
-        document.getElementById('expense-form').onsubmit = async function(ev) {
-          ev.preventDefault();
-          const amountInput = document.getElementById('amount').value;
-          const user = document.getElementById('user').value;
-          const category = document.getElementById('category').value;
-          const description = document.getElementById('description').value.trim();
-          const date = document.getElementById('date').value;
-          if (!amountInput || !user || !category || !date) return;
-          let amount = Number(amountInput);
-          if (category === 'Debt' && amount > 0) amount = -amount;
-          const updatedExpense = { amount, user, category, description, date };
-          await updateExpenseInSheet(id, updatedExpense);
-          await fetchExpensesFromSheet();
-          renderExpenses();
-          renderSummary();
-          renderPieChart();
-          renderBarChart();
-          this.reset();
-          document.getElementById('date').value = todayStr();
-          document.getElementById('expense-form').querySelector('button[type="submit"]').textContent = 'Add Expense';
-          document.getElementById('expense-form').onsubmit = null;
-        };
       }
     });
+
     document.getElementById('filter-btn').addEventListener('click', function() {
       filterFrom = document.getElementById('filter-from').value;
       filterTo = document.getElementById('filter-to').value;
@@ -683,14 +645,8 @@
     });
 
     // --- Init ---
-    (async function(){
-      document.getElementById('date').value = todayStr();
-      await fetchExpensesFromSheet();
-      renderExpenses();
-      renderSummary();
-      renderPieChart();
-      renderBarChart();
-    })();
+    document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    listenExpenses();
   </script>
 </body>
 </html>
