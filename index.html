@@ -409,6 +409,14 @@
       return expenses;
     }
 
+    function filterExpenses(expenses, from, to) {
+      return expenses.filter(e => {
+        if (from && e.date < from) return false;
+        if (to && e.date > to) return false;
+        return true;
+      });
+    }
+
     // --- Helpers ---
     function formatCurrency(amount) {
       return 'MYR ' + Number(amount).toLocaleString('en-MY', {minimumFractionDigits: 2});
