@@ -328,8 +328,6 @@
       </select>
       <input type="text" id="description" placeholder="Description (optional)" maxlength="32">
       <input type="date" id="date" required>
-      <label for="image" style="color:#fde047;font-weight:600;margin-bottom:0.2em;">Photo (optional):</label>
-      <input type="file" id="image" accept="image/*">
       <button type="submit">Add Expense</button>
     </form>
     <div class="summary" id="summary">
@@ -362,7 +360,6 @@
     // --- Firebase & Firestore Imports and Config ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyATU9XtyyfopWem1vh90N2edNB7w7fzhiY",
@@ -375,28 +372,7 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const storage = getStorage(app);
     // --- End Firebase Config ---
-
-    // --- Telegram Bot Config ---
-    // WARNING: Exposing your bot token in client-side code is insecure. Use only for demo/testing!
-    const TELEGRAM_BOT_TOKEN = '7865187047:AAEM9oy2KHO3uFt7FdAOV6P79HjqtcsIJIY'; // <-- User's bot token
-    const TELEGRAM_CHAT_ID = '-1002830535297'; // <-- User's group chat ID
-
-    async function sendToTelegram(expense) {
-      if (!expense.imageUrl) return;
-      const caption = `New Expense:\nUser: ${expense.user}\nAmount: ${expense.amount}\nCategory: ${expense.category}\nDescription: ${expense.description}\nDate: ${expense.date}`;
-      const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
-      await fetch(url, {
-        method: 'POST',
-        body: new URLSearchParams({
-          chat_id: TELEGRAM_CHAT_ID,
-          photo: expense.imageUrl,
-          caption: caption
-        })
-      });
-    }
-    // --- End Telegram Bot Config ---
 
     // --- Firestore CRUD ---
     let expenses = [];
@@ -586,30 +562,16 @@
       const category = document.getElementById('category').value;
       const description = document.getElementById('description').value.trim();
       const date = document.getElementById('date').value;
-      const imageInput = document.getElementById('image');
       if (!amountInput || !user || !category || !date) return;
       let amount = Number(amountInput);
       if (category === 'Debt' && amount > 0) amount = -amount;
-      let imageUrl = '';
-      if (imageInput.files.length > 0) {
-        const file = imageInput.files[0];
-        const imgRef = storageRef(storage, 'expense-images/' + Date.now() + '-' + file.name);
-        await uploadBytes(imgRef, file);
-        imageUrl = await getDownloadURL(imgRef);
-      }
-      const expense = { amount, user, category, description, date, imageUrl };
+      const expense = { amount, user, category, description, date };
       if (editId) {
         await updateDoc(doc(db, "expenses", editId), expense);
         editId = null;
         this.querySelector('button[type="submit"]').textContent = 'Add Expense';
       } else {
-        const docRef = await addDoc(expensesCol, expense);
-        // Send to Telegram only for new expenses with image
-        if (imageUrl) {
-          // Add id to expense for Telegram message
-          expense.id = docRef.id;
-          sendToTelegram(expense);
-        }
+        await addDoc(expensesCol, expense);
       }
       this.reset();
       document.getElementById('date').value = todayStr();
