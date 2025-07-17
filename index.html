@@ -584,23 +584,6 @@
       return sheetExpenses;
     }
 
-    // --- Polling ---
-    let pollInterval = setInterval(async () => {
-      await fetchExpensesFromSheet();
-      renderExpenses();
-      renderSummary();
-      renderPieChart();
-      renderBarChart();
-    }, 10000);
-
-    document.getElementById('refresh-btn').addEventListener('click', async function() {
-      await fetchExpensesFromSheet();
-      renderExpenses();
-      renderSummary();
-      renderPieChart();
-      renderBarChart();
-    });
-
     // --- Event Handlers ---
     document.getElementById('expense-form').addEventListener('submit', async function(e) {
       e.preventDefault();
