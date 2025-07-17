@@ -360,6 +360,7 @@
     // --- Firebase & Firestore Imports and Config ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+    // import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js"; // Removed
 
     const firebaseConfig = {
       apiKey: "AIzaSyATU9XtyyfopWem1vh90N2edNB7w7fzhiY",
@@ -372,7 +373,28 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    // const storage = getStorage(app); // Removed
     // --- End Firebase Config ---
+
+    // --- Telegram Bot Config ---
+    // WARNING: Exposing your bot token in client-side code is insecure. Use only for demo/testing!
+    const TELEGRAM_BOT_TOKEN = '7865187047:AAEM9oy2KHO3uFt7FdAOV6P79HjqtcsIJIY'; // <-- User's bot token
+    const TELEGRAM_CHAT_ID = '-1002830535297'; // <-- User's group chat ID
+
+    // async function sendToTelegram(expense) { // Removed
+    //   if (!expense.imageUrl) return; // Removed
+    //   const caption = `New Expense:\nUser: ${expense.user}\nAmount: ${expense.amount}\nCategory: ${expense.category}\nDescription: ${expense.description}\nDate: ${expense.date}`; // Removed
+    //   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`; // Removed
+    //   await fetch(url, { // Removed
+    //     method: 'POST', // Removed
+    //     body: new URLSearchParams({ // Removed
+    //       chat_id: TELEGRAM_CHAT_ID, // Removed
+    //       photo: expense.imageUrl, // Removed
+    //       caption: caption // Removed
+    //     }) // Removed
+    //   }); // Removed
+    // } // Removed
+    // --- End Telegram Bot Config ---
 
     // --- Firestore CRUD ---
     let expenses = [];
